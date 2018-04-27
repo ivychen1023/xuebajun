@@ -74,7 +74,7 @@ class ElementRecognition:
             # element = '等式' # 暂时不区分等式与方程
             element = '方程'
             # poly 判断元和次数
-            degrees = Poly(expr).degree_list()
+            degrees = poly(Add(expr.args[0], -expr.args[1])).degree_list()
             if len(degrees) == 1 and max(degrees) == 1:
                 element = '一元一次方程'
             if len(degrees) == 1 and max(degrees) == 2:
