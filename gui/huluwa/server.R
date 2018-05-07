@@ -37,9 +37,22 @@ shinyServer(function(input, output, session){
   observeEvent(input$solve_bt,{
     local_values[['solutions_steps_dat']] = get_solutions_steps_dat(input$your_problem,
                                                                     input$text_type)
+
     # print('~!!!!!!!!!!!!!!!!!!')
     # print(local_values[['solutions_steps_dat']][['steps_dat']])
   })
+  
+
+  observeEvent(input$pressKey,{
+    if(input$pressKey == 13){
+      local_values[['solutions_steps_dat']] = get_solutions_steps_dat(input$your_problem,
+                                                                      input$text_type)
+    }
+      
+    # print('~!!!!!!!!!!!!!!!!!!')
+    # print(local_values[['solutions_steps_dat']][['steps_dat']])
+  })
+  
   
   # 单道题目展示
   solution_steps_display <- function(steps_dat){
@@ -48,8 +61,10 @@ shinyServer(function(input, output, session){
       L <- vector("list", 2*nrow(steps_dat))
       for(i in 1:nrow(steps_dat)){
         dat <- steps_dat[i,]
-        L[[2*i - 1]] <- list(HTML(paste0(dat[['desc']], '<br>')))
-        L[[2*i]] <- list(withMathJaxR(HTML(paste0(dat[['expr']], '<br>'))))
+        L[[2*i - 1]] <- list(HTML(paste0('<span style="color:#3d81ed">',
+                                         dat[['desc']], 
+                                         '</span><br>')))
+        L[[2*i]] <- list(withMathJaxR(HTML(paste0(dat[['expr']], '<br><br>'))))
       }
     }
     return(L)
@@ -82,4 +97,15 @@ shinyServer(function(input, output, session){
       })
     }
   )
+  
+  
+  ######################################## 日志信息 ########################################
+  # python 脚本运行日志信息
+  output$logger <- renderUI(
+    HTML(local_values[['solutions_steps_dat']][['log_info']])
+  )
+  
 })
+
+
+
