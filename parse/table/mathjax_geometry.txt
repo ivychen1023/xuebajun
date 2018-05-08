@@ -1,0 +1,6 @@
+angle
+triangleABC
+vartriangle
+perp
+odot
+circ

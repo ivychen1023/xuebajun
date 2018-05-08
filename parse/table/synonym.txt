@@ -1,0 +1,6 @@
+绝对值:Abs
+Add:+
+Sub:-
+Mul:times
+Div:div
+乘方:幂
