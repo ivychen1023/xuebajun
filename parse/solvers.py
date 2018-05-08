@@ -321,6 +321,8 @@ def atom_solvers(expr):
 
     desc_list = []
     expr_list = []
+    theme_list = []
+    end_list = []
     for theme_name in theme_info:
         # if expr_element in theme_info[theme_name]['input_elements']:
         # 节点或者父节点在模板里即可
@@ -331,24 +333,38 @@ def atom_solvers(expr):
         if len(expr_element_set.intersection(set(theme_info[theme_name]['input_elements']))) > 0:
             print('theme_name:', theme_name)
             rst = theme_solvers(expr, theme_name)
+            desc_list_this = []
+            expr_list_this = []
+            theme_list_this = []
+            end_list_this = []
             try:
                 for step in rst[0]:
-                    desc_list.append(step['desc'])
-                    expr_list.append(''.join(['$', str(latex(step['expr'])), '$']))
+                    desc_list_this.append(step['desc'])
+                    expr_list_this.append(''.join(['$', str(latex(step['expr'])), '$']))
+                    theme_list_this.append(theme_name)
+                    end_list_this.append(rst[1])
 
                 # 如果找到能求出解的模板,则退出
-                if rst[1]:
-                    break
+                # if rst[1]:
+                #     break
             except:
                 error = ' '.join(['expr:', str(expr), '模板名称:', theme_name, '基本函数:', str(step),'异常 at Line:',
                                   str(sys.exc_info()[-1].tb_lineno), str(sys.exc_info())])
                 print(error)
                 log_info.append(error)
-                desc_list = []
-                expr_list = []
+                desc_list_this = []
+                expr_list_this = []
+                theme_list_this = []
+                end_list_this = []
+            desc_list.extend(desc_list_this)
+            expr_list.extend(expr_list_this)
+            theme_list.extend(theme_list_this)
+            end_list.extend(end_list_this)
 
     result_df['desc'] = desc_list
     result_df['expr'] = expr_list
+    result_df['theme'] = theme_list
+    result_df['end'] = end_list
     return [result_df, graph_df]
 
 
