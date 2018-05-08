@@ -176,6 +176,7 @@ def get_children(expr, code, par_node, index):
                                                  'code': this_code,
                                                  'func': item.func})
             graph.add_edge(par_node, this_node, attr_dict={'rel': rel.__name__, 'rel_func': rel})
+            index += 1
     return graph
 
 

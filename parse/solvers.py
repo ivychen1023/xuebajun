@@ -432,7 +432,7 @@ def huluwa_solvers(expr_txt, txt_type='auto'):
     expr_list = []
     try:
         if txt_type == 'latex':
-            expr_list = [process_sympy(expr_txt)]
+            expr_list = [parse_expr(str(process_sympy(expr_txt)), evaluate=False)]
         if txt_type == 'sympy':
             expr_list = [parse_expr(expr_txt, evaluate=False)]
         if txt_type == 'body':
