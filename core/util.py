@@ -45,3 +45,43 @@ def is_fractional_equation(expr, x=symbols('x')):
             if denominator is not None and max(Poly(denominator, x).degree_list()) > 0:
                 return True
     return False
+
+
+def is_same_expression(expr_a, expr_b):
+    """
+    判断是否为相同表达式
+    严格意义的字符串的相同,不是数学意义上的相同
+    :param expr_a:
+    :param expr_b:
+    :return:
+        True ;当字符串一致
+        False ;Else
+    """
+    return str(expr_a) == str(expr_b)
+
+
+def is_simplify(expr):
+    """
+    表达式是否已经化简
+    :param expr:
+    :return:
+    """
+    return is_same_expression(expr, simplify(expr))
+
+
+def is_not_frac_real(expr):
+    """
+    整体单项式
+    表达式已经化简
+    是个实数
+    但不是分数
+    :param expr:
+    :return:
+    """
+    if (not expr.is_Add) \
+            and is_simplify(expr) \
+            and expr.is_real \
+            and (get_denominator(expr) is None):
+        return True
+    return False
+
