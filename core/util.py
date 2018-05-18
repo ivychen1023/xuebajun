@@ -60,6 +60,18 @@ def is_same_expression(expr_a, expr_b):
     return str(expr_a) == str(expr_b)
 
 
+def is_sum_simplify(expr):
+    """
+    表达式是否已经加法化简:
+        所有位置的加法进行化简
+        若表达式中某代数式可加法化简,则同时会进行可能的乘法化简但单独的分母加法可化简除外
+    :param expr:
+    :return:
+    """
+    from sympy.simplify.simplify import sum_simplify
+    return is_same_expression(expr, sum_simplify(expr))
+
+
 def is_simplify(expr):
     """
     表达式是否已经化简
@@ -84,4 +96,6 @@ def is_not_frac_real(expr):
             and (get_denominator(expr) is None):
         return True
     return False
+
+
 
