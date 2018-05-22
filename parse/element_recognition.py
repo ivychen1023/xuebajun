@@ -12,8 +12,10 @@ default interpreter: python3
 Created on 2018-04-12
 @author: wangguojie
 """
-
-
+import os, sys
+sys.path.append('')
+sys.path.append(os.path.abspath(os.path.join('', os.pardir)))
+from core.util import *
 from sympy import *
 import networkx as nx
 import re
@@ -24,6 +26,7 @@ class ElementRecognition:
     """
     设置数学元素的标准是根据MI数学元素取最小辖域数学元素
     暂时'等式' 等价于 '方程'
+    新增方程组解析 2018-05-22
     """
     def __init__(self, expr_graph):
         """
@@ -40,7 +43,7 @@ class ElementRecognition:
           key: 数学元素
           value: key对应父节点组
         """
-        dat_list = list(MongoClient(host="10.8.8.71", connect=False)['mi']['elements'].find())
+        dat_list = list(MongoClient(host="10.8.8.71", connect=False)['mi']['elements'].find({'type': 'edge'}))
         for dat in dat_list:
             if dat['element'] in self.element_relations:
                 self.element_relations[dat['element']].update([dat['par_element']])
@@ -52,8 +55,10 @@ class ElementRecognition:
         nodes = list(reversed(list(nx.topological_sort(self.expr_graph))))
         element = None
         for node in nodes:
-            # 关系式、代数式、实数
-            if self.is_relational_expression(node):
+            # 关系式组、关系式、代数式、实数
+            if self.is_group_expression(node):
+                element = self.get_group_element(node)
+            elif self.is_relational_expression(node):
                 # 后代 successors self.expr_graph.successors(node)
                 element = self.get_relational_element(node)
             elif self.is_algebraic_expression(node):
@@ -62,10 +67,40 @@ class ElementRecognition:
                 element = self.get_real_element(node)
             else:
                 # 如果三者都不是 异常
-                print('无法识别的表达式:', self.expr_graph.node[node]['attr_dict']['expr'])
+                print('无法识别的表达式或组:', self.expr_graph.node[node]['attr_dict']['expr'])
             # 更新node信息
             self.expr_graph.node[node]['attr_dict'].update({'element': element})
         return self.expr_graph
+
+    def get_group_element(self, node):
+        """
+        目前仅支持二元一次方程组、三元一次方程组、分式方程组
+        """
+        element = '组'
+        equations = True
+        for sub_expr in self.expr_graph.node[node]['attr_dict']['expr']:
+            if not sub_expr.is_Equality:
+                equations = False
+                break
+        if equations:
+            element = '方程组'
+            variables = set([])
+            degrees = []
+            for sub_expr in self.expr_graph.node[node]['attr_dict']['expr']:
+                if is_fractional_equation(sub_expr, symbols('x')) \
+                        or is_fractional_equation(sub_expr, symbols('y')) \
+                        or is_fractional_equation(sub_expr, symbols('z')):
+                    return '分式方程组'
+                degrees.extend(Poly(sub_expr).degree_list())
+                print(sub_expr, Poly(sub_expr), Poly(sub_expr).degree_list())
+                variables.update(Poly(sub_expr).free_symbols)
+            print('variables:', variables)
+            print('degrees:', degrees)
+            if len(variables) == 2 and max(degrees) == 1:
+                element = '二元一次方程组'
+            if len(variables) == 3 and max(degrees) == 1:
+                element = '三元一次方程组'
+        return element
 
     def get_relational_element(self, node):
         # element = '关系式'
@@ -73,14 +108,19 @@ class ElementRecognition:
         if expr.is_Equality:
             # element = '等式' # 暂时不区分等式与方程
             element = '方程'
-            # Poly 判断元和次数
-            degrees = Poly(Add(expr.args[0], -expr.args[1])).degree_list()
-            if len(degrees) == 1 and max(degrees) == 1:
-                element = '一元一次方程'
-            if len(degrees) == 1 and max(degrees) == 2:
-                element = '一元二次方程'
-            if len(degrees) == 2 and max(degrees) == 1:
-                element = '二元一次方程'
+            # 分式方程 分母含有未知量均为分式方程
+            if is_fractional_equation(expr):
+                element = '分式方程'
+            else:
+                element = '整式方程'
+                # 正式方程 Poly 判断元和次数
+                degrees = Poly(Add(expr.args[0], -expr.args[1])).degree_list()
+                if len(degrees) == 1 and max(degrees) == 1:
+                    element = '一元一次方程'
+                if len(degrees) == 1 and max(degrees) == 2:
+                    element = '一元二次方程'
+                if len(degrees) == 2 and max(degrees) == 1:
+                    element = '二元一次方程'
         else:
             element = '不等式'
         return element
@@ -186,6 +226,15 @@ class ElementRecognition:
         实数判别
         """
         return not (self.is_relational_expression(node) or self.is_algebraic_expression(node))
+
+    def is_group_expression(self, node):
+        """
+        方程组判别
+        目前只支持方程组判别
+        :param node:
+        :return:
+        """
+        return type(self.expr_graph.node[node]['attr_dict']['expr']) is list
 
     def has_latin_alphabet(self, expr_m):
         return len(re.findall(self.latin_alphabet_re, str(expr_m))) > 0

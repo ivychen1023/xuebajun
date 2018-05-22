@@ -50,46 +50,217 @@ log_info = []
 # 解题模板相关信息
 # name, input_elements, steps
 theme_info = dict()
-for dat in mi['solutions_themes'].find({}):
-    name = dat['name']
-    theme_info_this = dict()
-    theme_info_this['input_elements'] = dat['input_elements'].split(', ')
-    theme_info_this['steps'] = dat['steps'].split(', ')
-    theme_info[name] = theme_info_this
-print('theme_info:', theme_info)
 
 
-# 解题步骤相关信息
-# name, input_elements, output_elements, check_func, core_func, type
+def get_theme_info():
+    global theme_info
+    # 基础模板与拆分子模板的名称映射,由Switch分支引起
+    base_theme_2_sub_themes = dict()
+    for dat in mi['solutions_themes'].find({'type': 'core'}):
+        base_name = dat['name']
+        input_elements = dat['input_elements'].split(', ')
+        steps_this_tmp = dat['steps'].split(', ')
+        steps_those = []
+        i = 0
+        while i < len(steps_this_tmp):
+            step = steps_this_tmp[i]
+            if step != 'SWITCH':
+                if len(steps_those) == 0:
+                    steps_those.append([step])
+                else:
+                    for steps in steps_those:
+                        steps.append(step)
+                i += 1
+            else:
+                # 处理 'SWITCH' 与 'END SWITCH' 之间的步骤
+                j = i + 1
+                case_steps = []
+                while j < len(steps_this_tmp):
+                    if steps_this_tmp[j] == 'END SWITCH':
+                        break
+                    if steps_this_tmp[j] == 'CASE':
+                        k = j + 1
+                        case_steps_this = []
+                        while k < len(steps_this_tmp):
+                            if steps_this_tmp[k] == 'CASE' or steps_this_tmp[k] == 'END SWITCH':
+                                if len(case_steps_this) > 0:
+                                    case_steps.append(case_steps_this)
+                                break
+                            else:
+                                s = steps_this_tmp[k]
+                                case_steps_this.append(s)
+                                k += 1
+                        j = k - 1
+                    j += 1
+                i = j + 1
+                # case_steps
+                if len(steps_those) == 0:
+                    steps_those = case_steps
+                else:
+                    steps_those_tmp = []
+                    for s1 in steps_those:
+                        for s2 in case_steps:
+                            steps_those_tmp.append(s1 + s2)
+                    steps_those = steps_those_tmp
+        for i in range(len(steps_those)):
+            theme_name = base_name
+            if len(steps_those) > 1:
+                theme_name = base_name + '-' + str(i + 1)
+            theme_info[theme_name] = {'input_elements': input_elements,
+                                      'steps': steps_those[i]}
+            if base_name in base_theme_2_sub_themes:
+                base_theme_2_sub_themes[base_name].update([theme_name])
+            else:
+                base_theme_2_sub_themes[base_name] = set([theme_name])
+
+    # 注意判断模板的加载顺序,保证引用其他模板时,必须加载完成,模板工厂不支持任何形式递归(直接的或间接的)
+    # 建立一个有向图,从根节点遍历
+    theme_dat_list = dict()
+    dat_list = mi['solutions_themes'].find({'type': 'block'})
+    g = nx.nx.DiGraph()
+    for dat in dat_list:
+        theme_dat_list[dat['name']] = dat
+        # 建立模板之间的有向边
+        for step in dat['steps'].split(', '):
+            if step.startswith('模板:'):
+                g.add_edge(step[3:], dat['name'])
+    theme_list = list(list(nx.topological_sort(g)))
+    print('theme_list:', theme_list)
+    print('base_theme_2_sub_themes:', base_theme_2_sub_themes)
+    for theme in theme_list:
+        # 排除基础模板
+        if theme not in theme_dat_list:
+            continue
+        dat = theme_dat_list[theme]
+        # 分支模板命名规则是 '基础模板名字'+'-'+'id编号 1-n'
+        base_name = dat['name']
+        input_elements = dat['input_elements'].split(', ')
+        steps_those = []
+        steps_this_tmp = dat['steps'].split(', ')
+        # print('steps_this_tmp:', steps_this_tmp)
+        i = 0
+        while i < len(steps_this_tmp):
+            step = steps_this_tmp[i]
+            if step != 'SWITCH':
+                if step.startswith('模板:'):
+                    if len(steps_those) == 0:
+                        # steps_those.append(theme_info[step[3:]]['steps'])
+                        for theme_this in base_theme_2_sub_themes[step[3:]]:
+                            steps_those.append(theme_info[theme_this]['steps'])
+                    else:
+                        steps_those_tmp = []
+                        for theme_this in base_theme_2_sub_themes[step[3:]]:
+                            for steps in steps_those:
+                                steps_those_tmp.append(steps + theme_info[theme_this]['steps'])
+                        steps_those = steps_those_tmp
+                else:
+                    if len(steps_those) == 0:
+                        steps_those.append([step])
+                    else:
+                        for steps in steps_those:
+                            steps.append(step)
+                i += 1
+            else:
+                # 处理 'SWITCH' 与 'END SWITCH' 之间的步骤
+                j = i + 1
+                case_steps = []  # [[s1,s2,...],[s1,s2,...],...]
+                while j < len(steps_this_tmp):
+                    if steps_this_tmp[j] == 'END SWITCH':
+                        break
+                    if steps_this_tmp[j] == 'CASE':
+                        k = j + 1
+                        case_steps_this = []  # [[s1,s2,...],[s1,s2,...],...]
+                        while k < len(steps_this_tmp):
+                            if steps_this_tmp[k] == 'CASE' or steps_this_tmp[k] == 'END SWITCH':
+                                if len(case_steps_this) > 0:
+                                    # case_steps.append(case_steps_this)
+                                    case_steps.extend(case_steps_this)
+                                break
+                            else:
+                                s = steps_this_tmp[k]
+                                if s.startswith('模板:'):
+                                    if len(case_steps_this) > 0:
+                                        case_steps_this_tmp = []
+                                        for theme_this in base_theme_2_sub_themes[s[3:]]:
+                                            for steps in case_steps_this:
+                                                case_steps_this_tmp.append(steps + theme_info[theme_this]['steps'])
+                                        case_steps_this = case_steps_this_tmp
+                                    else:
+                                        for theme_this in base_theme_2_sub_themes[s[3:]]:
+                                            case_steps_this.append(theme_info[theme_this]['steps'])
+                                else:
+                                    if len(case_steps_this) > 0:
+                                        for steps in case_steps_this:
+                                            steps.append(s)
+                                    else:
+                                        case_steps_this.append([s])
+                                k += 1
+                        j = k - 1
+                    j += 1
+                i = j + 1
+                # case_steps
+                if len(steps_those) == 0:
+                    steps_those = case_steps
+                else:
+                    steps_those_tmp = []
+                    for s1 in steps_those:
+                        for s2 in case_steps:
+                            steps_those_tmp.append(s1 + s2)
+                    steps_those = steps_those_tmp
+        # print('steps_those:', steps_those)
+        for i in range(len(steps_those)):
+            theme_name = base_name
+            if len(steps_those) > 1:
+                theme_name = base_name + '-' + str(i + 1)
+            theme_info[theme_name] = {'input_elements': input_elements,
+                                      'steps': steps_those[i]}
+            if base_name in base_theme_2_sub_themes:
+                base_theme_2_sub_themes[base_name].update([theme_name])
+            else:
+                base_theme_2_sub_themes[base_name] = set([theme_name])
+    # print('base_theme_2_sub_themes:', base_theme_2_sub_themes)
+    print('theme_info:', theme_info)
+
+
 step_info = dict()
-for dat in mi['solutions_steps'].find({}):
-    try:
-        step_info_this = dict()
-        step_info_this['input_elements'] = dat['input_elements'].split(', ')
-        step_info_this['output_elements'] = dat['output_elements'].split(', ')
-        exec(dat['func'])
-        func_name = rex.findall('def(.*?)\\(', dat['func'])[0].strip(' ')
-        step_info_this['core_func'] = eval(func_name)
-        dat['check'] = dat['check'].replace(' check(', ''.join([' ', func_name, '_check(']))
-        exec(dat['check'])
-        step_info_this['check_func'] = eval(rex.findall('def(.*?)\\(', dat['check'])[0].strip(' '))
-        step_info_this['type'] = dat['type']
-        name = dat['name']
-        step_info[name] = step_info_this
-    except:
-        print(sys.exc_info(), dat)
-        pass
-print('step info:', step_info)
+
+
+def get_step_info():
+    global step_info
+    # 解题步骤相关信息
+    # name, input_elements, output_elements, check_func, core_func, type
+    for dat in mi['solutions_steps'].find({}):
+        try:
+            step_info_this = dict()
+            step_info_this['input_elements'] = dat['input_elements'].split(', ')
+            step_info_this['output_elements'] = dat['output_elements'].split(', ')
+            exec(dat['func'])
+            func_name = rex.findall('def(.*?)\\(', dat['func'])[0].strip(' ')
+            step_info_this['core_func'] = eval(func_name)
+            dat['check'] = dat['check'].replace(' check(', ''.join([' ', func_name, '_check(']))
+            exec(dat['check'])
+            step_info_this['check_func'] = eval(rex.findall('def(.*?)\\(', dat['check'])[0].strip(' '))
+            step_info_this['type'] = dat['type']
+            name = dat['name']
+            step_info[name] = step_info_this
+        except:
+            print(sys.exc_info(), dat)
+    print('step info:', step_info)
+
 
 element_relations = dict()
-for dat in list(mi['elements'].find()):
-    if dat['element'] in element_relations:
-        element_relations[dat['element']].update([dat['par_element']])
-    else:
-        element_relations[dat['element']] = set([dat['par_element']])
 
 
-def theme_solvers(expr, theme):
+def get_element_relations():
+    global element_relations
+    for dat in list(mi['elements'].find({'type': 'edge'})):
+        if dat['element'] in element_relations:
+            element_relations[dat['element']].update([dat['par_element']])
+        else:
+            element_relations[dat['element']] = set([dat['par_element']])
+
+
+def atom_theme_solvers(expr, theme):
     """
         模板求解
         NOTE:
@@ -114,7 +285,15 @@ def theme_solvers(expr, theme):
     steps_list = []
     steps = []
     # print(theme_info[theme]['steps'])
-    for step in theme_info[theme]['steps']:
+
+    # 先提取出initial_list
+    initial_list = []
+    pos = 0
+    if 'INITIAL' in theme_info[theme]['steps'] and 'END INITIAL' in theme_info[theme]['steps']:
+        pos = theme_info[theme]['steps'].index('END INITIAL') + 1
+        initial_list = theme_info[theme]['steps'][theme_info[theme]['steps'].index('INITIAL') + 1: pos - 1]
+    for i in range(len(theme_info[theme]['steps'][pos:])):
+        step = theme_info[theme]['steps'][i + pos]
         if step not in ['LOOP', 'END LOOP']:
             steps.append(step)
         elif step == 'LOOP':
@@ -128,11 +307,15 @@ def theme_solvers(expr, theme):
     if len(steps) > 0:
         steps_list.append(steps)
 
+    print('initial_list:', initial_list)
+
     # 定位其实位置: 逆序自检,从满足check函数的开始化简或求解
     # 有点小问题: 很难避免 每一步的Check函数都是唯一严格的,策略就是依次向后校验
     # 定位变成一组位置,从后向前直至找到解
-    # 注意LOOP问题: 正常情况下,只需Check LOOP第一项即可
+    # 注意LOOP问题: 有异常或者全部check未通过才退出LOOP
     # 也可以放在生成steps_list之前定位,这里定位方便处理含有LOOP的模板
+    # 2018-05-21 对于定位结果,新增初始化步骤
+    #    初始化步骤是本模板必须运行的步骤,且只会出现在模板开始
     steps_list_list = []  # 一组定位结果
     i = len(steps_list)
     while i > 0:
@@ -143,7 +326,6 @@ def theme_solvers(expr, theme):
             try:
                 if step not in ['LOOP', 'END LOOP'] and step_info[step]['check_func'](expr):
                     print('定位:', step)
-                    # # 非循环list截取,理论上讲,再LOOP内,后面的能通过自检,前面的必然能通过自检
                     # if steps_list[i - 1][0] != 'LOOP':
                     #     steps_list[i - 1] = steps_list[i - 1][j-1:]
                     #
@@ -164,6 +346,13 @@ def theme_solvers(expr, theme):
             j -= 1
         i -= 1
 
+    # 根据initial_list 统一合并
+    if len(initial_list) > 0:
+        for steps_list in steps_list_list:
+            steps_list.insert(0, initial_list)
+
+    print('steps_list_list:', steps_list_list)
+
     expr_origin = expr
     for steps_list in steps_list_list:
         rst = []
@@ -176,7 +365,14 @@ def theme_solvers(expr, theme):
             # LOOP循环块
             if steps[0] == 'LOOP':
                 finished = False
+                loop_cnt = 0
                 while not finished:
+                    # 为了暂时预防返回desc异常,循环次数最多5次
+                    loop_cnt += 1
+                    if loop_cnt > 5:
+                        break
+                    # 有效解题步骤数
+                    eff_steps = 0
                     for j in range(len(steps[1: len(steps)-1])):
                     # while j < len(steps[1: len(steps)-1]):
                         step = steps[1: len(steps)-1][j]
@@ -195,9 +391,11 @@ def theme_solvers(expr, theme):
                                             # print('loop j:', j, len(steps))
                                             if j == len(steps[1: len(steps)-1]) - 1 and i == len(steps_list) - 1:
                                                 end_flag = True
-                                        else:
-                                            finished = True
-                                            break
+                                            # 成功经过处理 +1
+                                            eff_steps += 1
+                                        # else:
+                                        #     finished = True
+                                        #     break
                                 except:
                                     # 调用的函数有异常,退出此方案
                                     error = ' '.join(['expr:', str(expr), '基本函数:', step, '异常 at Line:',
@@ -207,10 +405,10 @@ def theme_solvers(expr, theme):
                                     finished = True
                                     i = len(steps_list)
                                     break
-                            else:
-                                # 不能通过自检,则循环块结束
-                                finished = True
-                                break
+                            # else:
+                            #     # 不能通过自检,则循环块结束
+                            #     finished = True
+                            #     break
                         except:
                             error = ' '.join(['expr:', str(expr), 'check函数:', step, '异常 at Line:',
                                               str(sys.exc_info()[-1].tb_lineno), str(sys.exc_info())])
@@ -218,6 +416,9 @@ def theme_solvers(expr, theme):
                             log_info.append(error)
                             finished = True
                             break
+
+                    if not finished and eff_steps == 0:
+                        finished = True
             # 正常步骤
             else:
                 for j in range(len(steps)):
@@ -268,56 +469,23 @@ def theme_solvers(expr, theme):
     return rst, end_flag
 
 
-def atom_solvers(expr):
+def theme_solvers(expr, expr_element):
     """
-        化简或求解一个代数式或等式
-        expr: sympy表达式
-        :return
-        data.frame1
+    基于模板求解
+    化简或求解一个代数式或等式
+    :param expr:
+        sympy表达式
+    :param expr_element:
+        表达式所属数学元素
+    :return:
+        data.frame
         name: result
         columns:
             desc: 描述,
-            expr_txt: 中间结果
-
-        data.frame2
-        name: graph
-        columns:
-            from: 父节点,
-            from_attr: 父节点属性即所属数学元素,
-            to: 子节点,
-            to_attr: 子节点属性即所属数学元素
-            edge_attr: 节点属性即对应数学操作符
+            expr: 中间结果
     """
     global theme_info, step_info, element_relations, log_info
     result_df = pd.DataFrame()
-    graph_df = pd.DataFrame()
-    expr_graph = expr2graph(expr, 1)
-    er = ElementRecognition(expr_graph)
-    er.set_elements()
-
-    # 解析图
-    par_nodes = []
-    par_attrs = []
-    child_nodes = []
-    child_attrs = []
-    edge_attrs = []
-    sorted_nodes = list(nx.topological_sort(expr_graph))
-    for node in sorted_nodes:
-        for child in expr_graph.successors(node):
-            par_nodes.append(node)
-            par_attrs.append(expr_graph.node[node]['attr_dict']['element'])
-            child_nodes.append(child)
-            child_attrs.append(expr_graph.node[child]['attr_dict']['element'])
-            edge_attrs.append(expr_graph.get_edge_data(node, child)['attr_dict']['rel'])
-    graph_df['from'] = par_nodes
-    graph_df['from_attr'] = par_attrs
-    graph_df['to'] = child_nodes
-    graph_df['to_attr'] = child_attrs
-    graph_df['edge_attr'] = edge_attrs
-
-    # 求解或化简, 先按照模板求解
-    expr_element = expr_graph.node[sorted_nodes[0]]['attr_dict']['element']
-    print('atom_solvers,expr_element:', expr_element)
 
     desc_list = []
     expr_list = []
@@ -332,7 +500,7 @@ def atom_solvers(expr):
         expr_element_set.update([expr_element])
         if len(expr_element_set.intersection(set(theme_info[theme_name]['input_elements']))) > 0:
             print('theme_name:', theme_name)
-            rst = theme_solvers(expr, theme_name)
+            rst = atom_theme_solvers(expr, theme_name)
             desc_list_this = []
             expr_list_this = []
             theme_list_this = []
@@ -365,7 +533,87 @@ def atom_solvers(expr):
     result_df['expr'] = expr_list
     result_df['theme'] = theme_list
     result_df['end'] = end_list
-    return [result_df, graph_df]
+    return result_df
+
+
+def auto_solvers(expr, expr_element):
+    """
+    自动化求解
+    化简或求解一个代数式或等式
+    :param expr:
+        sympy表达式
+    :param expr_element:
+        表达式所属数学元素
+    :return:
+        data.frame
+        name: result
+        columns:
+            desc: 描述,
+            expr: 中间结果
+    """
+    pass
+
+
+def get_expr_graph(expr):
+    """
+    :param expr:
+        sympy表达式
+    :return:
+        data.frame
+        name: graph
+        columns:
+            from: 父节点,
+            from_attr: 父节点属性即所属数学元素,
+            to: 子节点,
+            to_attr: 子节点属性即所属数学元素
+            edge_attr: 节点属性即对应数学操作符
+    """
+    graph_df = pd.DataFrame()
+    expr_graph = expr2graph(expr, 1)
+    er = ElementRecognition(expr_graph)
+    er.set_elements()
+
+    # 解析图
+    par_nodes = []
+    par_attrs = []
+    child_nodes = []
+    child_attrs = []
+    edge_attrs = []
+    sorted_nodes = list(nx.topological_sort(expr_graph))
+    for node in sorted_nodes:
+        for child in expr_graph.successors(node):
+            par_nodes.append(node)
+            par_attrs.append(expr_graph.node[node]['attr_dict']['element'])
+            child_nodes.append(child)
+            child_attrs.append(expr_graph.node[child]['attr_dict']['element'])
+            edge_attrs.append(expr_graph.get_edge_data(node, child)['attr_dict']['rel'])
+    graph_df['from'] = par_nodes
+    graph_df['from_attr'] = par_attrs
+    graph_df['to'] = child_nodes
+    graph_df['to_attr'] = child_attrs
+    graph_df['edge_attr'] = edge_attrs
+
+    # 求解或化简, 先按照模板求解
+    expr_element = expr_graph.node[sorted_nodes[0]]['attr_dict']['element']
+    print('get_expr_graph,expr_element:', expr_element)
+    return graph_df, expr_element
+
+
+def atom_solvers(expr):
+    """
+        化简或求解一个代数式或等式
+        expr:
+            sympy表达式
+        :return
+        data.frame
+        name: result
+        columns:
+            desc: 描述,
+            expr_txt: 中间结果
+    """
+    expr_graph = get_expr_graph(expr)
+    result_df = theme_solvers(expr, expr_graph[1])
+    return [result_df, expr_graph[0]]
 
 
 def solvers(expr_list):
@@ -421,9 +669,14 @@ def parse_txt_type(txt):
 
 
 def huluwa_solvers(expr_txt, txt_type='auto'):
-    global log_info
+    global log_info, theme_info, step_info, element_relations
+    print('初始化模板信息......')
+    get_theme_info()
+    print('初始化解题步骤信息......')
+    get_step_info()
+    print('初始化数学元素关系图信息......')
+    get_element_relations()
     log_info = []
-    # import re
     if txt_type is 'auto':
         txt_type = parse_txt_type(expr_txt)
     print('txt_type:', txt_type)
@@ -461,6 +714,7 @@ def test(expr_txt):
 
 
 # if __name__ == '__main__':
+#     test(sys.argv[1])
 #     try:
 #         expr_txt = None
 #         if len(sys.argv) > 1:

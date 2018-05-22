@@ -15,3 +15,8 @@ def sub(a, b):
     pass
 
 
+def contains(a):
+    pass
+
+
+
