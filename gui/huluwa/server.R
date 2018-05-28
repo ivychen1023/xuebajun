@@ -1,8 +1,9 @@
 
 shinyServer(function(input, output, session){
   
-  local_values <- reactiveValues(solutions_steps_dat = get_solutions_steps_dat('x^2 + 4 = 8 + x',
-                                                                               'latex'))
+  local_values <- reactiveValues(solutions_steps_dat = get_solutions_steps_dat('x/2 + 4 = 8',
+                                                                               'latex',
+                                                                               TRUE))
   # local_values <- reactiveValues(solutions_steps_dat = get_solutions_steps_dat(input$your_problem,
   #                                                                              input$text_type))
   
@@ -34,24 +35,42 @@ shinyServer(function(input, output, session){
   
   ######################################## 输出解题步骤 ####################################
   # 点击【GO】按钮,调python脚本解题并展示步骤
-  observeEvent(input$solve_bt,{
-    local_values[['solutions_steps_dat']] = get_solutions_steps_dat(input$your_problem,
-                                                                    input$text_type)
-
-    # print('~!!!!!!!!!!!!!!!!!!')
-    # print(local_values[['solutions_steps_dat']][['steps_dat']])
+  # observeEvent(input$solve_bt,{
+  #   local_values[['solutions_steps_dat']] = get_solutions_steps_dat(input$your_problem,
+  #                                                                   input$text_type,
+  #                                                                   input$debug_ck)
+  # })
+  
+  observe({
+    input$solve_bt
+    input$debug_ck
+    isolate({
+      local_values[['solutions_steps_dat']] = get_solutions_steps_dat(input$your_problem,
+                                                                      input$text_type,
+                                                                      input$debug_ck)
+    })
   })
   
 
   observeEvent(input$pressKey,{
     if(input$pressKey == 13){
       local_values[['solutions_steps_dat']] = get_solutions_steps_dat(input$your_problem,
-                                                                      input$text_type)
+                                                                      input$text_type,
+                                                                      input$debug_ck)
     }
-      
-    # print('~!!!!!!!!!!!!!!!!!!')
-    # print(local_values[['solutions_steps_dat']][['steps_dat']])
   })
+  
+  # observe({
+  #   input$debug_ck
+  #   if(input$pressKey == 13){
+  #     isolate({
+  #       local_values[['solutions_steps_dat']] = get_solutions_steps_dat(input$your_problem,
+  #                                                                       input$text_type,
+  #                                                                       input$debug_ck)
+  #     })
+  #   }
+  # })
+  
   
   
   # 单道题目展示
@@ -79,7 +98,11 @@ shinyServer(function(input, output, session){
     # print(nrow(dat))
     if(nrow(dat) > 0){
       for(problem_id in unique(dat[['id']])){
-        L <- append(L, solution_steps_display(dat[id==problem_id]))
+        for(theme_this in unique(dat[['theme']])){
+          L <- append(L, list(HTML(paste0('<span style="color:red;font-size:26px">',theme_this,'</span><br>'))))
+          L <- append(L, solution_steps_display(dat[id==problem_id & theme==theme_this]))
+          L <- append(L, list(HTML('<br>')))
+        }
         L <- append(L, list(HTML('<br>')))
       }
     }
@@ -102,7 +125,9 @@ shinyServer(function(input, output, session){
   ######################################## 日志信息 ########################################
   # python 脚本运行日志信息
   output$logger <- renderUI(
-    HTML(local_values[['solutions_steps_dat']][['log_info']])
+    if(input$debug_ck){
+      HTML(local_values[['solutions_steps_dat']][['log_info']])
+    }
   )
   
 })

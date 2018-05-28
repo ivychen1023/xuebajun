@@ -98,4 +98,42 @@ def is_not_frac_real(expr):
     return False
 
 
+def is_root(expr, x=symbols('x')):
+    """
+        判断表达式是否为方程的根
+    :param expr:
+    :param x:
+    :return:
+        True when expr is real or like x = 3, coefficient is 1 and equal real else
+        False
+    """
+    if expr.is_Relational:
+        if expr.args[0].is_Symbol and expr.args[1].is_real and is_simplify(expr.args[1]):
+            return True
+    elif expr.is_real and is_simplify(expr):
+        return True
+    return False
+
+
+def is_end_expr(expr, x=symbols('x')):
+    """
+    :param expr:
+        sympy 表达式
+        解集 [x1,x2,...]
+    :param x:
+        指定变量
+    :return:
+        判断表达式是否为最终形式,
+        返回True,当关系式是形如 x = 2的表达式即未知量系数为1,可以与Sympy求解结果类比;
+        返回True,当代数式为最简形式,不能进行加减乘除等任何形式化简,可以与Sympy化简结果类比
+    """
+    if type(expr) is list:
+        end = True
+        for sub_expr in expr:
+            if not is_root(sub_expr):
+                end = False
+        return end
+    elif is_root(expr):
+        return True
+    return False
 

@@ -1,6 +1,7 @@
 library(shiny)
 library(shinythemes)
 
+
 fluidPage(
   tags$script('
     $(document).on("keydown", function (e) {
@@ -15,7 +16,7 @@ fluidPage(
     column(6,
            textInput('your_problem',
                      label = NULL,
-                     value = 'x^2 + 4 = 8 + x',
+                     value = 'x/2 + 4 = 8',
                      width = '100%'),
            offset = 3,
            align="center"
@@ -39,15 +40,21 @@ fluidPage(
     )
   ),
   fluidRow(
-    column(4,
+    column(3,
            checkboxInput('parse_graph_display_ck',
                          label = 'diaplay parse graph',
                          value = TRUE,
                          width = '100%'),
-           offset = 4,
+           offset = 3,
+           align="center"
+    ),
+    column(3,
+           checkboxInput('debug_ck',
+                         label = 'debug',
+                         value = TRUE,
+                         width = '100%'),
            align="center"
     )
-
   ),
   br(),
   # 输出框,展示解题步骤
@@ -67,6 +74,15 @@ fluidPage(
     )
   ),
   br(),
+  # 习题库
+  fluidRow(
+    column(12,
+           dataTableOutput('problems_db_dt'),
+           offset = 0.2,
+           align="center"
+    )
+  ),
+  br(),
   fluidRow(
     # 解析图
     column(6,
@@ -74,14 +90,6 @@ fluidPage(
                             width = "auto",
                             height = '400px'),
            offset = 3,
-           align="center"
-    )
-  ),
-  # 习题库
-  fluidRow(
-    column(12,
-           dataTableOutput('problems_db_dt'),
-           offset = 0.2,
            align="center"
     )
   ),

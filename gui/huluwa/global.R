@@ -30,35 +30,48 @@ get_problem_db_infos <- function(){
 # 习题库Table
 problems_info_dat <- get_problem_db_infos()
 
-library(reticulate)
 if(Sys.info()[['sysname']] == 'Linux'){
-    use_python('/usr/bin/python3')
+    # use_python('/usr/bin/python3')
+    Sys.setenv(RETICULATE_PYTHON = '/home/shiny/envs/venv/bin/python3')
+    library(reticulate)
     setwd('/home/shiny/git/xuebajun/parse')
-    source_python('/home/shiny/git/xuebajun/parse/solvers.py')
+    # source_python('/home/shiny/git/xuebajun/parse/solvers.py')
 }else{
+  library(reticulate)
   use_python('/Library/Frameworks/Python.framework/Versions/3.6/bin/python3')
   setwd('/Users/wangguojie/git/xuebajun/parse')
-  source_python('/Users/wangguojie/git/xuebajun/parse/solvers.py')
+  # source_python('/Users/wangguojie/git/xuebajun/parse/solvers.py')
 }
 
+
+# library(reticulate)
+# use_python('/Library/Frameworks/Python.framework/Versions/3.6/bin/python3')
+# setwd('/Users/wangguojie/git/xuebajun/parse')
+# source_python('/Users/wangguojie/git/xuebajun/parse/solvers.py')
+
 # 调python脚本,返回解题步骤
-get_solutions_steps_dat <- function(problem_txt, txt_type='auto'){
+get_solutions_steps_dat <- function(problem_txt, txt_type='auto', debug_r=TRUE){
+  if(Sys.info()[['sysname']] == 'Linux')
+    source_python('/home/shiny/git/xuebajun/parse/solvers.py')
+  else
+    source_python('/Users/wangguojie/git/xuebajun/parse/solvers.py')
   steps_dat = NULL
   nodes_dat = NULL
   edges_dat = NULL
   log_info = NULL
   tryCatch({
-    rst = huluwa_solvers(problem_txt, txt_type)
+    rst = huluwa_solvers(problem_txt, txt_type, debug_r)
     result_dat <- rst[1][[1]]
     graph_dat <- rst[2][[1]]
     log_info <- rst[3][[1]]
     # print(paste('log:', log_info))
+    # print(paste('result_dat:', result_dat))
     log_info <- paste(log_info, collapse  = '<br>')
     edges_dat <- data.table(from=graph_dat[['from']],
                             to=graph_dat[['to']],
                             label=graph_dat[['edge_attr']])
-    ids <- c(graph_dat[['from']], graph_dat[['to']])
-    labels <- c(graph_dat[['from_attr']], graph_dat[['to_attr']])
+    ids <- append(graph_dat[['from']], graph_dat[['to']])
+    labels <- append(graph_dat[['from_attr']], graph_dat[['to_attr']])
     if(length(ids) > 0){
       for(i in 1:length(ids)){
         labels[i] <- paste(substr(ids[i], regexpr(' ', ids[i])[1] + 1, nchar(ids[i])), labels[i])
@@ -70,7 +83,9 @@ get_solutions_steps_dat <- function(problem_txt, txt_type='auto'){
     
     steps_dat <- data.table(id=result_dat[['id']],
                             desc=result_dat[['desc']],
-                            expr=result_dat[['expr']])
+                            expr=result_dat[['expr']],
+                            theme=result_dat[['theme']],
+                            end=result_dat[['end']])
   }, error = function(e) {})
   
   list(steps_dat = steps_dat,

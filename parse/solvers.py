@@ -50,6 +50,7 @@ log_info = []
 # 解题模板相关信息
 # name, input_elements, steps
 theme_info = dict()
+debug = True
 
 
 def get_theme_info():
@@ -389,7 +390,12 @@ def atom_theme_solvers(expr, theme):
                                             expr = rst_this['expr']
                                             # print('loop i:', i, len(steps_list))
                                             # print('loop j:', j, len(steps))
-                                            if j == len(steps[1: len(steps)-1]) - 1 and i == len(steps_list) - 1:
+                                            # 模板最后一步
+                                            # if j == len(steps[1: len(steps)-1]) - 1 and i == len(steps_list) - 1:
+                                            #     end_flag = True
+                                            # elif is_end_expr(expr):
+                                            #     end_flag = True
+                                            if is_end_expr(expr):
                                                 end_flag = True
                                             # 成功经过处理 +1
                                             eff_steps += 1
@@ -437,7 +443,12 @@ def atom_theme_solvers(expr, theme):
                                         expr = rst_this['expr']
                                         # print('i:', i, len(steps_list))
                                         # print('j:', j, len(steps))
-                                        if j == len(steps) - 1 and i == len(steps_list) - 1:
+                                        # 模板最后一步
+                                        # if j == len(steps) - 1 and i == len(steps_list) - 1:
+                                        #     end_flag = True
+                                        # elif is_end_expr(expr):
+                                        #     end_flag = True
+                                        if is_end_expr(expr):
                                             end_flag = True
                             except Exception as e:
                                 # 调用的函数有异常,退出此方案
@@ -484,7 +495,7 @@ def theme_solvers(expr, expr_element):
             desc: 描述,
             expr: 中间结果
     """
-    global theme_info, step_info, element_relations, log_info
+    global theme_info, step_info, element_relations, log_info, debug
     result_df = pd.DataFrame()
 
     desc_list = []
@@ -499,18 +510,25 @@ def theme_solvers(expr, expr_element):
         expr_element_set = element_relations[expr_element]
         expr_element_set.update([expr_element])
         if len(expr_element_set.intersection(set(theme_info[theme_name]['input_elements']))) > 0:
-            print('theme_name:', theme_name)
             rst = atom_theme_solvers(expr, theme_name)
+            print('theme_name:', theme_name, rst[1])
             desc_list_this = []
             expr_list_this = []
             theme_list_this = []
             end_list_this = []
             try:
-                for step in rst[0]:
-                    desc_list_this.append(step['desc'])
-                    expr_list_this.append(''.join(['$', str(latex(step['expr'])), '$']))
-                    theme_list_this.append(theme_name)
-                    end_list_this.append(rst[1])
+                if debug:
+                    for step in rst[0]:
+                        desc_list_this.append(step['desc'])
+                        expr_list_this.append(''.join(['$', str(latex(step['expr'])), '$']))
+                        theme_list_this.append(theme_name)
+                        end_list_this.append(rst[1])
+                elif rst[1]:
+                    for step in rst[0]:
+                        desc_list_this.append(step['desc'])
+                        expr_list_this.append(''.join(['$', str(latex(step['expr'])), '$']))
+                        theme_list_this.append(theme_name)
+                        end_list_this.append(rst[1])
 
                 # 如果找到能求出解的模板,则退出
                 # if rst[1]:
@@ -663,13 +681,28 @@ def parse_txt_type(txt):
             or '=' in txt \
             or '>' in txt \
             or '<' in txt \
-            or '^' in txt:
+            or '^' in txt \
+            or type(txt) is list:
         txt_type = 'latex'
     return txt_type
 
 
-def huluwa_solvers(expr_txt, txt_type='auto'):
-    global log_info, theme_info, step_info, element_relations
+def huluwa_solvers(expr_txt, txt_type='auto', debug_m=True):
+    """
+    :param expr_txt:
+        需要求解的表达式,可能是单独的表达式,也可能是list形式,比如: 'x^2 + 3x + 8 = 9'或 '[x^2 + 3x + 8 = 9, y + x = 9]'
+    :param txt_type:
+        文本类型 latex/sympy/body
+    :param debug_m:
+        debug模式会返回所有模板结果,即便没有求得最终解
+        非debug即正常模式,只返回有解的结果(下一步可以优化为只返回最优结果)
+    :return:
+    """
+    global log_info, theme_info, step_info, element_relations, debug
+    debug = debug_m
+    # print('.....................------>', debug)
+    # 解析方程组
+    expr_txt = parse_expr_input(expr_txt)
     print('初始化模板信息......')
     get_theme_info()
     print('初始化解题步骤信息......')
@@ -677,6 +710,7 @@ def huluwa_solvers(expr_txt, txt_type='auto'):
     print('初始化数学元素关系图信息......')
     get_element_relations()
     log_info = []
+    # import re
     if txt_type is 'auto':
         txt_type = parse_txt_type(expr_txt)
     print('txt_type:', txt_type)
@@ -685,9 +719,16 @@ def huluwa_solvers(expr_txt, txt_type='auto'):
     expr_list = []
     try:
         if txt_type == 'latex':
-            expr_list = [parse_expr(str(process_sympy(expr_txt)), evaluate=False)]
+            if type(expr_txt) is list:
+                expr_list = [[parse_expr(str(process_sympy(x)), evaluate=False) for x in expr_txt]]
+            else:
+                expr_list = [parse_expr(str(process_sympy(expr_txt)), evaluate=False)]
+            # print('expr_list:', expr_list)
         if txt_type == 'sympy':
-            expr_list = [parse_expr(expr_txt, evaluate=False)]
+            if type(expr_txt) is list:
+                expr_list = [[parse_expr(x, evaluate=False) for x in expr_txt]]
+            else:
+                expr_list = [parse_expr(expr_txt, evaluate=False)]
         if txt_type == 'body':
             expr_txt = expr_txt.replace('，', ',').replace('$,$', '').replace('$$', '')
             expr_txt = rex.sub('(<div>.*?</div>)', '', expr_txt)
@@ -699,11 +740,22 @@ def huluwa_solvers(expr_txt, txt_type='auto'):
             a.sympy_check()
             expr_list = a.expr_list
     except:
-        error = ' '.join(['expr:', expr_txt, '异常 at Line:',
+        error = ' '.join(['huluwa_solvers expr:', expr_txt, '异常 at Line:',
                           str(sys.exc_info()[-1].tb_lineno), str(sys.exc_info())])
         print(error)
         log_info.append(error)
     return solvers(expr_list)
+
+
+def parse_expr_input(expr_txt):
+    exprs = expr_txt.strip()
+    expr_txt = expr_txt.strip()
+    if expr_txt.startswith('[') and expr_txt.endswith(']'):
+        exprs = []
+        for sub in expr_txt[1: -1].split(','):
+            exprs.append(sub.strip())
+    # print('expr_txt:', expr_txt)
+    return exprs
 
 
 def test(expr_txt):
