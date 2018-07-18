@@ -138,7 +138,7 @@ def is_end_expr(expr, x=symbols('x')):
     return False
 
 #一次函数-斜率(y=kx+b,k≠0)
-def functionk(expr,x=symbols('x'), y=symbols('y')):
+def is_functionk(expr,x=symbols('x'), y=symbols('y')):
     expr1 = expand(expr)
     lh = expr1.args[0]
     rh = expr1.args[1]
@@ -150,7 +150,7 @@ def functionk(expr,x=symbols('x'), y=symbols('y')):
 
 
 #一次函数-与x轴交点(y=kx+b,k≠0)
-def pointx(expr,x=symbols('x'), y=symbols('y')):
+def is_pointx(expr,x=symbols('x'), y=symbols('y')):
     lh = expr.args[0]
     rh = expr.args[1]
     expr1 = Eq(0,expr.args[1])
