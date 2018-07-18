@@ -137,3 +137,25 @@ def is_end_expr(expr, x=symbols('x')):
         return True
     return False
 
+#一次函数-斜率(y=kx+b,k≠0)
+def functionk(expr,x=symbols('x'), y=symbols('y')):
+    expr1 = expand(expr)
+    lh = expr1.args[0]
+    rh = expr1.args[1]
+    x1= Poly(rh,x).all_coeffs()
+    expr_new = x1[0]
+    result = []
+    result.append({'desc': '函数斜率k=', 'expr': expr_new,'step':'函数斜率k=','value':expr_new})
+    return result
+
+
+#一次函数-与x轴交点(y=kx+b,k≠0)
+def pointx(expr,x=symbols('x'), y=symbols('y')):
+    lh = expr.args[0]
+    rh = expr.args[1]
+    expr1 = Eq(0,expr.args[1])
+    expr2 = solve(expr1)
+    expr_new = (expr2[0],0)
+    result = []
+    result.append({'desc': '与x轴交点', 'expr': expr_new,'step':'与x轴交点','value':expr_new})
+    return result
